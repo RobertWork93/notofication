@@ -108,3 +108,17 @@ Single Maven module, not modular for now. Code is split into layers by package u
 - `NotificationAppApplication` (root package): Spring Boot entry point.
 
 Dependencies point one way: controller → service → repository. Controllers must not call repositories. Tests mirror the main package layout.
+
+## REST API Conventions
+
+Expose all functionality as REST APIs and follow REST best practices:
+
+- **Resources:** URLs name resources with plural nouns, never verbs (`/alerts`, not `/createAlert`). Users, alerts and events are each top-level resources (`/users`, `/alerts`, `/events`). A single alert is addressed with its owner as `/alerts/{alertId}/users/{userId}`. Alerts are created with `POST /alerts` and listed per user with `GET /alerts?userId={userId}`.
+- **Versioning:** prefix every path with `/api/v1`.
+- **Methods:** `GET` reads, `POST` creates, `PUT` replaces a whole resource, `PATCH` changes part of one, `DELETE` removes. `GET`, `PUT` and `DELETE` must be idempotent.
+- **Status codes:** `200 OK` for reads and updates, `201 Created` with a `Location` header for creates, `204 No Content` for deletes, `400` for invalid input, `404` for a missing resource, `409` for a conflict with current state. Never return `200` with an error body.
+- **Payloads:** JSON with camelCase field names. Timestamps are ISO-8601 in UTC (`2026-11-21T14:52:00Z`). IDs are UUIDs.
+- **Errors:** return RFC 9457 Problem Details (`application/problem+json`, Spring's `ProblemDetail`) from one `@RestControllerAdvice`.
+- **Validation:** validate request bodies with Bean Validation (`@Valid`) at the controller.
+- **DTOs:** controllers accept and return DTOs, never JPA entities.
+- **Collections:** paginate list endpoints with `page` and `size` query parameters.
