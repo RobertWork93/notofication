@@ -9,9 +9,11 @@ Follow these three phases for every change to application behavior.
 
 ## 1. RED
 
-1. Understand the requirement from the latest `docs/stage-n/plan.md` and define the expected behavior.
+1. Understand the requirement from the latest `docs/stage-n/plan.md` and `docs/stage-n/implementation-plan.md` and define the expected behavior.
 2. Write meaningful tests first (see the `spring-boot-testing` skill).
-3. Run them before writing any production code (`mvn test -Dtest=ClassName`).
+3. Run them before writing any production code:
+   - Unit and Web MVC tests (`*Test`): `mvn test -Dtest=ClassName`
+   - Integration tests (`*IT`, need Docker): `mvn verify -Dit.test=ClassName -Dtest=NoMatch -Dsurefire.failIfNoSpecifiedTests=false`
 4. Confirm they fail for the expected reason: the behavior is missing, not the test setup broken.
 
 ## 2. GREEN

@@ -1,5 +1,9 @@
-package com.notificationapp.controller;
+package com.notificationapp.web.controller;
 
+import com.notificationapp.configuration.SecurityConfiguration;
+import org.springframework.context.annotation.Import;
+import org.springframework.security.test.context.support.WithMockUser;
+import com.notificationapp.controller.HelloController;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -10,13 +14,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(HelloController.class)
+@Import(SecurityConfiguration.class)
+@WithMockUser(roles = "ADMIN")
 class HelloControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
 
     @Test
-    void helloReturnsHelloWorld() throws Exception {
+    void shouldReturnHelloWorld() throws Exception {
         mockMvc.perform(get("/hello"))
                 .andExpect(status().isOk())
                 .andExpect(content().string("Hello, World!"));

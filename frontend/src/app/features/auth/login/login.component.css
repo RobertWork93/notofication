@@ -1,0 +1,13 @@
+.auth-page {
+  display: flex;
+  justify-content: center;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: var(--app-form-width);
+}
+
+.auth-footer {
+  padding: 0 var(--app-spacing);
+}

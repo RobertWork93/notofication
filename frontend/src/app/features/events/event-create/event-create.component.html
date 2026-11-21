@@ -1,0 +1,54 @@
+<section class="page" aria-labelledby="event-create-title">
+  <header class="page-header">
+    <h1 id="event-create-title">New event</h1>
+  </header>
+
+  <form class="form-column" [formGroup]="form" (ngSubmit)="save()" novalidate>
+    <mat-form-field appearance="outline">
+      <mat-label>Type</mat-label>
+      <mat-select formControlName="type" required>
+        @for (eventType of eventTypes; track eventType.value) {
+          <mat-option [value]="eventType.value">{{ eventType.label }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Title</mat-label>
+      <input matInput formControlName="title" maxlength="200" required />
+      @if (form.controls.title.hasError('required')) {
+        <mat-error>Title is required.</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Source</mat-label>
+      <input matInput formControlName="source" maxlength="100" required />
+      <mat-hint>Who reported the event, for example "usgs".</mat-hint>
+      @if (form.controls.source.hasError('required')) {
+        <mat-error>Source is required.</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Occurred at</mat-label>
+      <input matInput formControlName="occurredAt" type="datetime-local" required />
+      <mat-hint>In your local time. It is sent to the server in UTC.</mat-hint>
+      @if (form.controls.occurredAt.hasError('required')) {
+        <mat-error>Occurred at is required.</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Payload (optional JSON object)</mat-label>
+      <textarea matInput formControlName="payload" rows="6" class="payload" placeholder='{"magnitude": 6.8}'></textarea>
+      @if (form.controls.payload.hasError('jsonObject')) {
+        <mat-error>Enter a JSON object, for example {{ '{' }}"region": "Pacific"{{ '}' }}.</mat-error>
+      }
+    </mat-form-field>
+
+    <div class="form-actions">
+      <button mat-flat-button type="submit" [disabled]="saving()">Create event</button>
+    </div>
+  </form>
+</section>

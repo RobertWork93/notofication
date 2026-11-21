@@ -1,0 +1,41 @@
+<section class="page" aria-labelledby="alert-form-title">
+  <header class="page-header">
+    <h1 id="alert-form-title">{{ isEdit() ? 'Edit alert' : 'New alert' }}</h1>
+  </header>
+
+  <form class="form-column" [formGroup]="form" (ngSubmit)="save()" novalidate>
+    <mat-form-field appearance="outline">
+      <mat-label>Name</mat-label>
+      <input matInput formControlName="name" maxlength="100" required />
+      <mat-hint>A label for this alert, for example "Earthquakes".</mat-hint>
+      @if (form.controls.name.hasError('required')) {
+        <mat-error>Name is required.</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Event type</mat-label>
+      <mat-select formControlName="eventType" required>
+        @for (eventType of eventTypes; track eventType.value) {
+          <mat-option [value]="eventType.value">{{ eventType.label }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Notify me by</mat-label>
+      <mat-select formControlName="channel" required>
+        @for (channel of channels; track channel.value) {
+          <mat-option [value]="channel.value">{{ channel.label }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-slide-toggle formControlName="enabled" class="enabled-toggle">Enabled</mat-slide-toggle>
+
+    <div class="form-actions">
+      <button mat-flat-button type="submit" [disabled]="saving()">{{ isEdit() ? 'Save' : 'Create alert' }}</button>
+      <a mat-button routerLink="/alerts" [queryParams]="backQueryParams()">Cancel</a>
+    </div>
+  </form>
+</section>

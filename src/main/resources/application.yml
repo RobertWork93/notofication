@@ -1,3 +1,30 @@
 spring:
   application:
     name: notification-app
+
+  # Reads local settings such as ADMIN_EMAIL and ADMIN_PASSWORD from .env in the working directory, if it exists.
+  config:
+    import: optional:file:.env[.properties]
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/notification_app}
+    username: ${DB_USERNAME:notification}
+    password: ${DB_PASSWORD:notification}
+
+  mvc:
+    problemdetails:
+      enabled: true
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+
+# The first admin user, created at startup if both values are set.
+app:
+  admin:
+    email: ${ADMIN_EMAIL:}
+    password: ${ADMIN_PASSWORD:}

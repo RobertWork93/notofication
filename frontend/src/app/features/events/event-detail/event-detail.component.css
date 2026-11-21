@@ -1,0 +1,30 @@
+.details {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--app-spacing-small) var(--app-spacing);
+  margin: var(--app-spacing) 0;
+}
+
+.details dt {
+  font-weight: 500;
+}
+
+.details dd {
+  margin: 0;
+}
+
+.id {
+  word-break: break-all;
+}
+
+.payload-title {
+  font-size: 1rem;
+}
+
+.payload {
+  overflow-x: auto;
+  padding: var(--app-spacing-small);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.04);
+  font-family: "Roboto Mono", Menlo, Consolas, monospace;
+}

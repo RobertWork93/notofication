@@ -1,0 +1,39 @@
+<section class="page auth-page" aria-labelledby="login-title">
+  <mat-card class="auth-card">
+    <mat-card-header>
+      <mat-card-title id="login-title">Log in</mat-card-title>
+    </mat-card-header>
+
+    <mat-card-content>
+      <form class="form-column" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+        <mat-form-field appearance="outline">
+          <mat-label>Email</mat-label>
+          <input matInput formControlName="email" type="text" autocomplete="username" required />
+          @if (form.controls.email.hasError('required')) {
+            <mat-error>Email is required.</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Password</mat-label>
+          <input matInput formControlName="password" type="password" autocomplete="current-password" required />
+          @if (form.controls.password.hasError('required')) {
+            <mat-error>Password is required.</mat-error>
+          }
+        </mat-form-field>
+
+        @if (errorMessage(); as message) {
+          <p class="error-text" role="alert">{{ message }}</p>
+        }
+
+        <div class="form-actions">
+          <button mat-flat-button type="submit" [disabled]="submitting()">Log in</button>
+        </div>
+      </form>
+    </mat-card-content>
+
+    <mat-card-footer class="auth-footer">
+      <p class="muted">No account yet? <a routerLink="/register">Sign up</a></p>
+    </mat-card-footer>
+  </mat-card>
+</section>

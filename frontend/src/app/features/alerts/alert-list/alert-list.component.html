@@ -1,0 +1,65 @@
+<section class="page" aria-labelledby="alerts-title">
+  <header class="page-header">
+    <div>
+      <h1 id="alerts-title">{{ isOtherUser() ? 'User alerts' : 'My alerts' }}</h1>
+      @if (isOtherUser()) {
+        <p class="muted owner">Managing the alerts of user {{ ownerId() }}</p>
+      }
+    </div>
+    <a mat-flat-button routerLink="/alerts/new" [queryParams]="ownerQueryParams()">New alert</a>
+  </header>
+
+  @if (!loading() && alerts().length === 0) {
+    <p class="muted">No alerts yet. Create one to get notified about breaking news or natural disasters.</p>
+  } @else {
+    <div class="table-container">
+      <table mat-table [dataSource]="alerts()" class="alerts-table" aria-describedby="alerts-title">
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef scope="col">Name</th>
+          <td mat-cell *matCellDef="let alert">{{ alert.name }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="eventType">
+          <th mat-header-cell *matHeaderCellDef scope="col">Event type</th>
+          <td mat-cell *matCellDef="let alert">{{ alert.eventType | eventTypeLabel }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="channel">
+          <th mat-header-cell *matHeaderCellDef scope="col">Channel</th>
+          <td mat-cell *matCellDef="let alert">{{ alert.channel | channelLabel }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="enabled">
+          <th mat-header-cell *matHeaderCellDef scope="col">Enabled</th>
+          <td mat-cell *matCellDef="let alert">
+            <mat-slide-toggle
+              [checked]="alert.enabled"
+              (change)="setEnabled(alert, $event)"
+              [aria-label]="'Enable alert ' + alert.name"
+            />
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef scope="col"><span class="visually-hidden">Actions</span></th>
+          <td mat-cell *matCellDef="let alert" class="actions">
+            <a mat-button [routerLink]="['/alerts', alert.id, 'edit']" [queryParams]="ownerQueryParams()">Edit</a>
+            <button mat-button type="button" class="delete" (click)="deleteAlert(alert)">Delete</button>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="columns"></tr>
+        <tr mat-row *matRowDef="let row; columns: columns"></tr>
+      </table>
+    </div>
+
+    <mat-paginator
+      [length]="totalElements()"
+      [pageIndex]="pageIndex()"
+      [pageSize]="pageSize()"
+      [pageSizeOptions]="pageSizeOptions"
+      (page)="changePage($event)"
+      aria-label="Choose an alerts page"
+    />
+  }
+</section>

@@ -1,0 +1,78 @@
+/* Shared design values and the few layout classes every page reuses. Component styles live next to their components. */
+
+:root {
+  --app-spacing: 16px;
+  --app-spacing-small: 8px;
+  --app-max-width: 1040px;
+  --app-form-width: 480px;
+  --app-color-muted: #5f6368;
+  --app-color-danger: #b3261e;
+  --app-color-success: #146c2e;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+/* The app uses the light Material theme only. Without this, a browser in dark mode darkens the page background. */
+html {
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  font-family: Roboto, "Helvetica Neue", Arial, sans-serif;
+  background-color: var(--mat-sys-background);
+  color: var(--mat-sys-on-background);
+}
+
+/* A centered page column. */
+.page {
+  box-sizing: border-box;
+  max-width: var(--app-max-width);
+  margin: 0 auto;
+  padding: var(--app-spacing);
+}
+
+/* A page title with optional actions on the right. */
+.page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--app-spacing);
+  margin-bottom: var(--app-spacing);
+}
+
+.page-header h1 {
+  margin: 0;
+}
+
+/* A narrow single-column form. */
+.form-column {
+  display: flex;
+  flex-direction: column;
+  max-width: var(--app-form-width);
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--app-spacing-small);
+  margin-top: var(--app-spacing-small);
+}
+
+.muted {
+  color: var(--app-color-muted);
+}
+
+.error-text {
+  color: var(--app-color-danger);
+}
+
+/* Used by NotificationService for error snack bars. */
+.snackbar-error {
+  --mat-snack-bar-container-color: var(--app-color-danger);
+  --mat-snack-bar-supporting-text-color: #ffffff;
+}

@@ -1,0 +1,33 @@
+<section class="page" aria-labelledby="event-title">
+  @if (errorMessage(); as message) {
+    <h1 id="event-title">Event</h1>
+    <p class="error-text" role="alert">{{ message }}</p>
+  } @else if (event(); as event) {
+    <mat-card>
+      <mat-card-header>
+        <mat-card-title id="event-title">{{ event.title }}</mat-card-title>
+        <mat-card-subtitle>{{ event.type | eventTypeLabel }}</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <dl class="details">
+          <dt>Source</dt>
+          <dd>{{ event.source }}</dd>
+          <dt>Occurred at</dt>
+          <dd><time [attr.datetime]="event.occurredAt">{{ event.occurredAt | date: 'medium' }}</time></dd>
+          <dt>Received at</dt>
+          <dd><time [attr.datetime]="event.receivedAt">{{ event.receivedAt | date: 'medium' }}</time></dd>
+          <dt>Event id</dt>
+          <dd class="id">{{ event.id }}</dd>
+        </dl>
+
+        @if (event.payload) {
+          <h2 class="payload-title">Payload</h2>
+          <pre class="payload">{{ event.payload | json }}</pre>
+        }
+      </mat-card-content>
+    </mat-card>
+  } @else {
+    <h1 id="event-title">Event</h1>
+    <p class="muted">Loading…</p>
+  }
+</section>

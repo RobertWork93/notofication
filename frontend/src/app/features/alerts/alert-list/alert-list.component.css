@@ -1,0 +1,29 @@
+.owner {
+  margin: var(--app-spacing-small) 0 0;
+}
+
+.table-container {
+  overflow-x: auto;
+}
+
+.alerts-table {
+  width: 100%;
+}
+
+.actions {
+  white-space: nowrap;
+  text-align: right;
+}
+
+.delete {
+  --mat-button-text-label-text-color: var(--app-color-danger);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

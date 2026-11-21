@@ -1,0 +1,19 @@
+<mat-toolbar color="primary" class="header">
+  <a class="brand" routerLink="/">Notification App</a>
+
+  <nav class="nav" aria-label="Main navigation">
+    @if (currentUser(); as user) {
+      <a mat-button routerLink="/alerts" routerLinkActive="active">My alerts</a>
+      @if (isAdmin()) {
+        <a mat-button routerLink="/users" routerLinkActive="active">Users</a>
+        <a mat-button routerLink="/events/new" routerLinkActive="active">New event</a>
+      }
+      <a mat-button routerLink="/account" routerLinkActive="active">Account</a>
+      <span class="user" aria-label="Logged-in user">{{ user.email }} ({{ user.role }})</span>
+      <button mat-stroked-button type="button" (click)="logout()">Log out</button>
+    } @else {
+      <a mat-button routerLink="/login" routerLinkActive="active">Log in</a>
+      <a mat-button routerLink="/register" routerLinkActive="active">Sign up</a>
+    }
+  </nav>
+</mat-toolbar>
