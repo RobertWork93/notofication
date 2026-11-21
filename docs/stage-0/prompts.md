@@ -5,8 +5,6 @@ Prompt:
 Help me identifying the functional and non functional requirements for this project.
 Currently i have the following list:
 
-
-<pasted_content id="801c">
 1. Functional requirements
 ID    Requirement
 FR-01    Users can create, edit, enable, disable, and delete alerts.
@@ -22,7 +20,6 @@ FR-10    Administrators can monitor notification activity.
 2. Non-functional requirements
 NFR-01    The system must handle temporary failures and retry notifications.
 NFR-02    The architecture must be modular and extensible.
-</pasted_content id="801c">
 
 Answer:
 The list is a good start. `docs/plan.md` and `docs/decision-log.md` (referenced in CLAUDE.md) do not exist yet, so this review is not checked against them.
