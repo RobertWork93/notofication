@@ -52,3 +52,15 @@ Note: CLAUDE.md refers to D-002 (no application code until implementation is app
 - **Consequences:**
   - Confirming or dropping each proposed item will update its status here, as a new entry if it contradicts this one.
   - Until then, the proposed items are not implementation requirements.
+
+## D-007: Implementation has started; the no-code rule is lifted
+
+- **Status:** Confirmed (2026-11-21)
+- **Decision:** Application code may now be written. The Spring Boot skeleton (Maven, Java 21, Spring Boot 4.2.0, Lombok) was created on the user's explicit request. This supersedes the "no application code" rule that CLAUDE.md attributed to D-002, which has no entry in this log.
+- **Options considered:**
+  - Keep planning only until a feature is specified in full. Not chosen.
+  - Create the skeleton now and build features against the requirements in [plan.md](plan.md). Chosen.
+- **Consequences:**
+  - CLAUDE.md now states the phase as implementation.
+  - The "No application code is written until implementation is approved" line in [plan.md](plan.md) is now out of date. It was not changed in this entry.
+  - Feature code still follows D-003 to D-006. Provisional items in D-006 are not yet requirements.

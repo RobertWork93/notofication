@@ -2,10 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Current phase: planning
+## Current phase: implementation (started 2026-11-21)
 
 Quoted project description: "We want users to be able to set up alerts so they get notified when something important happens in the world — like breaking news, market movements, natural disasters, that kind of thing. Should work for both email and Slack. Make it flexible enough that we can add more channels later."
-The project is in discovery and architecture planning for an alerts feature. No application code is written!
+The project moved from planning to early implementation (see D-007 in `docs/decision-log.md`). The Spring Boot skeleton exists. Feature code is not written yet. The requirements in `docs/plan.md` and the decisions in `docs/decision-log.md` still govern what gets built.
 
 ## Conversation History
 
@@ -49,8 +49,27 @@ Chosen tech stack (proposed by the user, not yet implemented):
 - JUnit 5 and Mockito for tests
 - Docker and Docker Compose
 
+Build tool: Maven (`pom.xml`, Spring Boot 4.2.0 parent, Java 21 with Lombok as an annotation processor).
+
+Commands (run from the repository root):
+- Build and run all tests: `mvn verify`
+- Compile only: `mvn compile`
+- Run the app: `mvn spring-boot:run` (no database is configured yet)
+- Run a single test class: `mvn test -Dtest=ClassName`
+- Run a single test method: `mvn test -Dtest=ClassName#methodName`
+
 Still open:
-- Build tool: Maven or Gradle (not chosen).
 - Queue implementation: asynchronous delivery is confirmed (D-004), but the technology is not chosen.
 
-Once the build tool and project files exist, replace this section's open items with the real build, test, and run commands, including how to run a single test. Then describe the high-level architecture, covering only what takes reading several files to understand.
+## Architecture
+
+Single Maven module, not modular for now. Code is split into layers by package under `com.notificationapp`:
+
+- `controller`: HTTP endpoints. Calls services only.
+- `service`: business logic. Calls repositories and other services.
+- `repository`: persistence access. Not used yet.
+- `NotificationAppApplication` (root package): Spring Boot entry point.
+
+Dependencies point one way: controller → service → repository. Controllers must not call repositories. Tests mirror the main package layout.
+
+Modularising (for example into `app`, `alert`, `event`, `notification` Maven modules) is deferred. The `docs/` planning files describe the intended domains.

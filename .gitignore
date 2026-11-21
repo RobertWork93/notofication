@@ -12,3 +12,4 @@ Notificationapp.iml
 # Build files
 build/
 dist/
+target/
