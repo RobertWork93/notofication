@@ -1,0 +1,36 @@
+
+@startuml system-overview
+
+title Notification App - High-Level Architecture
+
+actor User
+actor Admin
+actor "Event Source" as Source
+
+rectangle "Notification System" {
+    component "API" as API
+    database "Database" as DB
+    queue "Event Queue" as Queue
+    component "Event Processor" as Processor
+    component "Notification Service" as Notification
+}
+
+cloud "Email" as Email
+cloud "Slack" as Slack
+
+Source --> API : New event
+API --> DB : Save event
+API --> Queue : Queue event
+
+Queue --> Processor : Process event
+Processor --> DB : Find matching alerts
+Processor --> Queue : Queue notifications
+
+Queue --> Notification : Send notifications
+Notification --> Email
+Notification --> Slack
+
+User --> API : Manage alerts
+Admin --> API : Manage and monitor
+
+@enduml
