@@ -1,0 +1,14 @@
+# macOS
+.DS_Store
+
+# JetBrains IDEs
+.idea/
+Notificationapp.iml
+
+# Environment variables
+.env
+.env.*
+
+# Build files
+build/
+dist/
