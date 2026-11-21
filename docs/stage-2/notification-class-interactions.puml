@@ -1,0 +1,89 @@
+@startuml notification-class-interactions
+
+title Stage 2 - Notification service: class interactions
+
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+hide empty members
+
+package "controller" {
+  class EventController
+}
+
+package "service" {
+  class EventService {
+    + create(request): Event
+  }
+  class OutboxWorker <<@Scheduled>> {
+    + poll()
+  }
+  class OutboxProcessor {
+    + processNext(): boolean
+    + markFailed(id, error)
+  }
+  class DeliveryWorker <<@Scheduled>> {
+    + poll()
+  }
+  class DeliveryProcessor {
+    + processNext(): boolean
+    + markFailed(id, error)
+  }
+  interface NotificationSender {
+    + channel(): Channel
+    + send(message: NotificationMessage)
+  }
+  class EmailNotificationSender {
+    log.info(...)
+  }
+  class SlackNotificationSender {
+    log.info(...)
+  }
+}
+
+package "repository" {
+  class EventRepository
+  class OutboxRepository {
+    + claimNext(): Optional<OutboxRecord>
+  }
+  class AlertRepository {
+    + findByEventTypeAndEnabledTrue(type)
+  }
+  class NotificationDeliveryRepository {
+    + insertIfAbsent(...)
+    + claimNext(): Optional<NotificationDelivery>
+  }
+}
+
+package "model" {
+  class Event
+  class Alert
+  class OutboxRecord <<table: event_outbox>>
+  class NotificationDelivery
+}
+
+' 1. Event registration: event and outbox record in one transaction
+EventController --> EventService : create(request)
+EventService --> EventRepository : save(event)
+EventService --> OutboxRepository : save(outbox record PENDING)
+
+' 2. Outbox processing: one transaction per record
+OutboxWorker --> OutboxProcessor : processNext() in a loop
+OutboxProcessor --> OutboxRepository : claimNext()\nFOR UPDATE SKIP LOCKED
+OutboxProcessor --> EventRepository : load event
+OutboxProcessor --> AlertRepository : find matching alerts
+OutboxProcessor --> NotificationDeliveryRepository : insert job per alert\nON CONFLICT DO NOTHING
+
+' 3. Delivery: one transaction per job
+DeliveryWorker --> DeliveryProcessor : processNext() in a loop
+DeliveryProcessor --> NotificationDeliveryRepository : claimNext()\nFOR UPDATE SKIP LOCKED
+DeliveryProcessor --> NotificationSender : send(NotificationMessage)\nby channel
+
+NotificationSender <|.. EmailNotificationSender
+NotificationSender <|.. SlackNotificationSender
+
+' Data
+OutboxRecord --> Event
+NotificationDelivery --> Event
+NotificationDelivery --> Alert
+
+@enduml

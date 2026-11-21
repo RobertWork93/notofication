@@ -18,7 +18,70 @@ class SchemaConstraintsIT extends AbstractIntegrationTest {
     void shouldApplyAllMigrations() {
         Integer applied = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM databasechangelog", Integer.class);
 
-        assertThat(applied).isEqualTo(5);
+        assertThat(applied).isEqualTo(8);
+    }
+
+    @Test
+    void shouldRejectUnknownOutboxStatus() {
+        UUID eventId = UUID.fromString(createEvent("breaking_news", "Election called"));
+
+        assertThatThrownBy(() -> jdbcTemplate.update("""
+                INSERT INTO event_outbox (id, event_id, status, created_at) VALUES (?, ?, 'DONE', now())
+                """, UUID.randomUUID(), eventId))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void shouldRejectOutboxRecordForMissingEvent() {
+        assertThatThrownBy(() -> jdbcTemplate.update("""
+                INSERT INTO event_outbox (id, event_id, status, created_at) VALUES (?, ?, 'PENDING', now())
+                """, UUID.randomUUID(), UUID.randomUUID()))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void shouldAllowOnlyOneDeliveryPerEventAndAlert() {
+        UUID userId = UUID.fromString(createUser("jane.doe@example.com", "Jane Doe"));
+        UUID alertId = UUID.fromString(createAlert(userId.toString(), "Quakes", "natural_disaster"));
+        UUID eventId = UUID.fromString(createEvent("natural_disaster", "Earthquake"));
+        insertDelivery(eventId, alertId, userId, "email", "PENDING");
+
+        assertThatThrownBy(() -> insertDelivery(eventId, alertId, userId, "email", "PENDING"))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void shouldRejectUnknownDeliveryStatusAndChannel() {
+        UUID userId = UUID.fromString(createUser("jane.doe@example.com", "Jane Doe"));
+        UUID alertId = UUID.fromString(createAlert(userId.toString(), "Quakes", "natural_disaster"));
+        UUID eventId = UUID.fromString(createEvent("natural_disaster", "Earthquake"));
+
+        assertThatThrownBy(() -> insertDelivery(eventId, alertId, userId, "email", "DELIVERED"))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> insertDelivery(eventId, alertId, userId, "sms", "PENDING"))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void shouldDeleteDeliveriesWhenTheirUserIsDeleted() {
+        UUID userId = UUID.fromString(createUser("jane.doe@example.com", "Jane Doe"));
+        UUID alertId = UUID.fromString(createAlert(userId.toString(), "Quakes", "natural_disaster"));
+        UUID eventId = UUID.fromString(createEvent("natural_disaster", "Earthquake"));
+        insertDelivery(eventId, alertId, userId, "email", "PENDING");
+
+        jdbcTemplate.update("DELETE FROM users WHERE id = ?", userId);
+
+        Integer deliveries = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM notification_deliveries WHERE alert_id = ?", Integer.class, alertId);
+        assertThat(deliveries).isZero();
+    }
+
+    private void insertDelivery(UUID eventId, UUID alertId, UUID userId, String channel, String status) {
+        jdbcTemplate.update("""
+                INSERT INTO notification_deliveries
+                    (id, event_id, alert_id, user_id, channel, recipient, status, created_at)
+                VALUES (?, ?, ?, ?, ?, 'jane.doe@example.com', ?, now())
+                """, UUID.randomUUID(), eventId, alertId, userId, channel, status);
     }
 
     @Test

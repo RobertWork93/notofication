@@ -28,3 +28,11 @@ app:
   admin:
     email: ${ADMIN_EMAIL:}
     password: ${ADMIN_PASSWORD:}
+
+  # Background workers that turn new events into notifications (see docs/stage-2).
+  notifications:
+    batch-size: 50
+    outbox-poll-interval-ms: 2000
+    delivery-poll-interval-ms: 2000
+    scheduling:
+      enabled: true

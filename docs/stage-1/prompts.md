@@ -732,3 +732,32 @@ Created README.md in the repository root. It covers:
 
 The README's .env example uses placeholder credentials, not the real values from your local .env. The commands match the ones verified earlier in this session; they were not re-run for this change.
 ---
+---
+Date: 2026-11-21 21:55
+
+Prompt:
+when i stop the application why i dont lose my data in db?
+
+Answer:
+Stopping the application only stops the database container; it does not delete it or its data.
+
+- application.yml has no spring.docker.compose.lifecycle-management setting, so Spring Boot uses its default, start_and_stop. On startup it runs docker compose up; on shutdown it runs docker compose stop, not docker compose down.
+- The postgres:18-alpine image declares /var/lib/postgresql as a volume. compose.yaml defines no named volume, so Docker creates an anonymous volume for it. Checked: notificationapp-postgres-1 mounts volume 7d23b89f… at /var/lib/postgresql.
+- docker compose stop keeps both the container and that volume. The next mvn spring-boot:run starts the same container again, and Liquibase sees the changesets as already applied, so the data is still there.
+
+Data is lost only when the container or volume is removed:
+- docker compose down: removes the container. The anonymous volume stays behind unused, and the next start creates a new container with a new, empty volume.
+- docker compose down -v: also removes the volume.
+- Deleting the container or volume in Docker Desktop.
+
+Correction: section 5 of docs/stage-1/auth-implementation-plan.md says "the local Compose database has no volume, so starting it fresh is enough". That is wrong. Data survives restarts, so a fresh database needs docker compose down first. The file was not changed.
+---
+---
+Date: 2026-11-21 21:56
+
+Prompt:
+Yes, correct it
+
+Answer:
+Corrected section 5 of docs/stage-1/auth-implementation-plan.md. The wrong sentence "the local Compose database has no volume, so starting it fresh is enough" now says: the local Compose database keeps its data across application restarts in an anonymous Docker volume, because Spring Boot only runs docker compose stop on shutdown. To start with an empty database, run docker compose down before the next start. Nothing else was changed.
+---

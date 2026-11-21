@@ -100,8 +100,7 @@ Commands (run from the repository root). Docker must be running: the integration
 - Run a single unit or Web MVC test: `mvn test -Dtest=ClassName` or `mvn test -Dtest=ClassName#methodName`
 - Run a single integration test: `mvn verify -Dit.test=ClassName -Dtest=NoMatch -Dsurefire.failIfNoSpecifiedTests=false`
 
-Still open:
-- Queue implementation: asynchronous delivery is confirmed (D-004), but the technology is not chosen.
+Queue: asynchronous delivery (D-004) uses a transactional outbox plus database-backed delivery jobs in PostgreSQL, with no message broker (D-010 in `docs/stage-2/decision-log.md`).
 
 ## Architecture
 
@@ -132,6 +131,17 @@ How the pieces fit together:
 - **Enums:** `EventType` and `Channel` hold their lowercase wire value. Jackson uses `@JsonValue`/`@JsonCreator`, and the database uses the auto-applied converters in `model`.
 - **Schema:** Liquibase owns it (`src/main/resources/db/changelog`, formatted SQL), and Hibernate only validates it.
 - **Time:** timestamps come from the `Clock` bean in `configuration`, so tests can fix the time.
+- **Notifications:** the design and rules are in `docs/stage-2/`.
+  - **Event and outbox:** `EventService.create` saves the event and an `event_outbox` record in one transaction.
+  - **Outbox worker:** `OutboxWorker` (`@Scheduled`) calls `OutboxProcessor.processNext()`. In one transaction, the processor:
+    1. claims a record with `FOR UPDATE SKIP LOCKED`;
+    2. finds the enabled alerts of the event type;
+    3. inserts one `notification_deliveries` job per alert (`ON CONFLICT (event_id, alert_id) DO NOTHING`);
+    4. marks the record `PROCESSED`.
+  - **Delivery worker:** `DeliveryWorker` calls `DeliveryProcessor`, which claims a job the same way and passes a `NotificationMessage` to the `NotificationSender` for the job's channel.
+  - **Senders:** `EmailNotificationSender` and `SlackNotificationSender` only log for now. A new channel is one more `NotificationSender`.
+  - **Failures:** a failure rolls back and marks the record or job `FAILED` in a second transaction. There are no retries.
+  - **Settings:** `app.notifications.*` holds the batch size and poll intervals. `app.notifications.scheduling.enabled=false` turns the workers off; integration tests do this and call the processors directly.
 - **Tests:**
   - Integration tests extend `support/AbstractIntegrationTest`. It starts the app on a random port with Testcontainers PostgreSQL and a startup admin. Before each test it deletes everything except that admin, and its `client` sends the admin's credentials.
   - Web MVC tests `@Import(SecurityConfiguration.class)`. They run as `@WithMockUser(roles = "ADMIN")`, or as a specific user through `support/SecurityTestSupport.as(user)`.

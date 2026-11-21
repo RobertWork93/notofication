@@ -19,7 +19,8 @@ import org.springframework.test.web.servlet.client.RestTestClient;
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {
                 "app.admin.email=" + AbstractIntegrationTest.ADMIN_EMAIL,
-                "app.admin.password=" + AbstractIntegrationTest.ADMIN_PASSWORD
+                "app.admin.password=" + AbstractIntegrationTest.ADMIN_PASSWORD,
+                "app.notifications.scheduling.enabled=false"
         })
 @Import(TestcontainersConfiguration.class)
 public abstract class AbstractIntegrationTest {
@@ -42,6 +43,8 @@ public abstract class AbstractIntegrationTest {
     @BeforeEach
     void setUpClientAndKeepOnlyAdmin() {
         client = clientAs(ADMIN_EMAIL, ADMIN_PASSWORD);
+        jdbcTemplate.execute("DELETE FROM notification_deliveries");
+        jdbcTemplate.execute("DELETE FROM event_outbox");
         jdbcTemplate.execute("DELETE FROM events");
         jdbcTemplate.execute("DELETE FROM alerts");
         jdbcTemplate.execute("DELETE FROM users WHERE role <> 'ADMIN'");
@@ -71,9 +74,25 @@ public abstract class AbstractIntegrationTest {
      * Creates an email alert as the admin and returns its id.
      */
     protected String createAlert(String userId, String name, String eventType) {
+        return createAlert(userId, name, eventType, "email", true);
+    }
+
+    /**
+     * Creates an alert with the given channel and enabled flag as the admin, and returns its id.
+     */
+    protected String createAlert(String userId, String name, String eventType, String channel, boolean enabled) {
         return createAndReturnId(client, "/api/v1/alerts", """
-                {"userId": "%s", "name": "%s", "eventType": "%s", "channel": "email"}
-                """.formatted(userId, name, eventType));
+                {"userId": "%s", "name": "%s", "eventType": "%s", "channel": "%s", "enabled": %s}
+                """.formatted(userId, name, eventType, channel, enabled));
+    }
+
+    /**
+     * Creates an event as the admin and returns its id.
+     */
+    protected String createEvent(String type, String title) {
+        return createAndReturnId(client, "/api/v1/events", """
+                {"type": "%s", "title": "%s", "source": "test", "occurredAt": "2026-11-21T14:52:00Z"}
+                """.formatted(type, title));
     }
 
     private static String createAndReturnId(RestTestClient restClient, String path, String json) {

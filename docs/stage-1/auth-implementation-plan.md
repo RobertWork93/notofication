@@ -63,7 +63,7 @@ Changeset `005-users-authentication.sql`:
 | `users.password_hash` | `VARCHAR(100)` | Not null |
 | `users.role` | `VARCHAR(16)` | Not null, `CHECK (role IN ('ADMIN', 'USER'))` |
 
-Both columns are `NOT NULL`, so the changeset fails on a database that already has users. There is no production data, and the local Compose database has no volume, so starting it fresh is enough.
+Both columns are `NOT NULL`, so the changeset fails on a database that already has users. There is no production data. The local Compose database keeps its data across application restarts in an anonymous Docker volume, because Spring Boot only runs `docker compose stop` on shutdown. To start with an empty database, run `docker compose down` before the next start.
 
 ## 6. Code changes
 

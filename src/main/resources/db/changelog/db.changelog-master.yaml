@@ -14,3 +14,12 @@ databaseChangeLog:
   - include:
       file: changes/005-users-authentication.sql
       relativeToChangelogFile: true
+  - include:
+      file: changes/006-create-event-outbox.sql
+      relativeToChangelogFile: true
+  - include:
+      file: changes/007-create-notification-deliveries.sql
+      relativeToChangelogFile: true
+  - include:
+      file: changes/008-alerts-matching-index.sql
+      relativeToChangelogFile: true

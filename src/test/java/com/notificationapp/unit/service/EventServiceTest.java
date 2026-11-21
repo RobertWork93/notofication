@@ -3,12 +3,16 @@ package com.notificationapp.unit.service;
 import com.notificationapp.dto.CreateEventRequest;
 import com.notificationapp.model.Event;
 import com.notificationapp.model.EventType;
+import com.notificationapp.model.OutboxRecord;
+import com.notificationapp.model.OutboxStatus;
 import com.notificationapp.repository.EventRepository;
+import com.notificationapp.repository.OutboxRepository;
 import com.notificationapp.service.EventService;
 import com.notificationapp.service.NotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -23,6 +27,7 @@ import static com.notificationapp.support.TestDataFactory.event;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,12 +39,15 @@ class EventServiceTest {
     @Mock
     private EventRepository eventRepository;
 
+    @Mock
+    private OutboxRepository outboxRepository;
+
     // Built by hand instead of @InjectMocks, because the service also needs a fixed Clock.
     private EventService eventService;
 
     @BeforeEach
     void setUp() {
-        eventService = new EventService(eventRepository, Clock.fixed(NOW, ZoneOffset.UTC));
+        eventService = new EventService(eventRepository, outboxRepository, Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     @Test
@@ -56,6 +64,23 @@ class EventServiceTest {
         assertThat(event.getOccurredAt()).isEqualTo(OCCURRED);
         assertThat(event.getPayload()).isEqualTo(payload);
         assertThat(event.getReceivedAt()).isEqualTo(NOW);
+    }
+
+    @Test
+    void shouldSavePendingOutboxRecordForNewEvent() {
+        when(eventRepository.save(any(Event.class))).thenAnswer(invocation -> {
+            Event saved = invocation.getArgument(0);
+            saved.setId(EVENT_ID);
+            return saved;
+        });
+
+        eventService.create(new CreateEventRequest(EventType.BREAKING_NEWS, "Election called", "reuters", OCCURRED, null));
+
+        ArgumentCaptor<OutboxRecord> outbox = ArgumentCaptor.forClass(OutboxRecord.class);
+        verify(outboxRepository).save(outbox.capture());
+        assertThat(outbox.getValue().getEventId()).isEqualTo(EVENT_ID);
+        assertThat(outbox.getValue().getStatus()).isEqualTo(OutboxStatus.PENDING);
+        assertThat(outbox.getValue().getCreatedAt()).isEqualTo(NOW);
     }
 
     @Test

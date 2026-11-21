@@ -1,6 +1,6 @@
 # Stage 1 Progress
 
-**Status:** Implemented and reviewed (2026-11-21), then simplified to an MVP, with HTTP Basic authentication added. The custom error handling was removed on request. Nothing is committed yet.
+**Status:** Completed (2026-11-21). Implemented and reviewed, then simplified to an MVP, with HTTP Basic authentication and the Angular frontend added. The custom error handling was removed on request. Committed as "Create frontend and backend MVP with basic auth". The open issues below carry over to later stages. Stage 2 starts the notification service.
 
 ## Completed
 
