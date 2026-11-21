@@ -20,3 +20,24 @@ Each decision has an ID, a status (**Confirmed** or **Provisional**), the option
   - Resolves the open question "queue technology" from D-004 for the MVP. A broker can be added later behind the outbox without changing event ingestion.
   - Delivery is at least once. Jobs are idempotent per `(event_id, alert_id)`.
   - Several application instances can run the workers safely.
+
+## D-011: Modular monolith with three Maven modules
+
+- **Status:** Confirmed (2026-11-21). The modules were named by the user; the structure was shown first and approved.
+- **Decision:** the backend is one deployable application built from three Maven modules under a parent pom.
+  - `event`: events and the `EventCreated` application event.
+  - `notification`: the outbox, delivery jobs, workers and senders.
+  - `app`: users, alerts, security, configuration, Liquibase, and the runnable entry point.
+  - **Dependencies:** they point one way: app → notification → event.
+  - **Public API:** each module exposes its contract in an `api` package.
+  - **Ports:** a module that needs data from a higher module defines a port, which the higher module implements (`AlertLookup`).
+  - **Outbox:** the outbox is written by a synchronous `@EventListener` on `EventCreated`, inside the event's transaction.
+  - **Errors:** `NotFoundException` is replaced by Spring's `ResponseStatusException`, so no shared module is needed.
+- **Options considered:**
+  - Packages in one Maven module, with boundaries checked by Spring Modulith tests. Not chosen: Maven modules make a wrong-way dependency a compile error.
+  - A fourth `common` module for shared types. Not chosen: each shared type has a clear owner (`EventType` belongs to `event`, `Channel` to `notification`), and the only other shared class was replaced by `ResponseStatusException`.
+  - `app` holding alerts with the notification module depending on `app`. Not possible: it would create a cycle.
+- **Consequences:**
+  - **Migrations:** the Liquibase changelogs stay at the same classpath path in `app`, so existing databases are not re-migrated.
+  - **Tests:** unit tests live in their module. Web MVC and integration tests live in `app`, the only module with a Spring Boot configuration.
+  - **Running:** `mvn spring-boot:run` from the root runs only `app`, with the root as its working directory.

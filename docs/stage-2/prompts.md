@@ -188,3 +188,135 @@ Docs:
 - stage-2 progress.md records everything.
 - docs/architecture/ is not updated (on hold).
 ---
+---
+Date: 2026-11-21 23:45
+
+Prompt:
+Refactor the spring app to use the modular monolith architecture!
+I identified 3 modules: app, notication, event
+
+show me the new structure before modfiying or editing something.
+
+Answer:
+Proposed the module structure only. No code or project files were changed.
+
+Proposal: a Maven multi-module build with a parent pom and three modules, event, notification and app. Dependencies run one way: app → notification → event, and app → event. Inside each module, the existing n-tier packages stay (controller, service, repository, model, dto, configuration).
+- event: events (controller, service, repository, entity), EventType, and a public api package (EventType, the EventCreated application event, and an EventLookup interface with an EventInfo record).
+- notification: the outbox, deliveries, processors, workers, senders, Channel and NotificationProperties. It listens to EventCreated synchronously, in the event's transaction, to write the outbox record. A public api package defines Channel and an AlertLookup port (with a MatchedAlert record), which app implements.
+- app: the @SpringBootApplication, users, alerts, security, admin bootstrap, Clock, the hello endpoint, application.yml, and all Liquibase changelogs at their current classpath paths. Liquibase identifies changesets by file path, so moving them would re-run migrations on existing databases.
+Breaking the cycle: notification needs alerts and users from app, but app depends on notification. So notification defines the AlertLookup port and app implements it. The event module saves the event and publishes EventCreated, and the outbox write still happens in the same transaction.
+Other points: NotFoundException is replaced by Spring's ResponseStatusException (404), so no shared module is needed. Unit tests stay in their module; web and integration tests live in app, which has the Spring Boot configuration. spring-boot:run uses the root as working directory, so compose.yaml and .env keep working. The frontend is unaffected.
+Decisions asked: Maven modules or one module with Spring Modulith; the ResponseStatusException choice; documenting the refactor in stage-2 or a new stage-3.
+---
+---
+Date: 2026-11-22 00:01
+
+Prompt:
+Approve and refactor
+
+Answer:
+Refactored the backend into a modular monolith with the Maven modules event, notification and app, as shown and approved. I applied my recommended options: Maven modules, ResponseStatusException instead of NotFoundException, and documentation in stage-2. Behaviour is unchanged. mvn clean verify passes with 174 tests (event 16, notification 22, app 96 + 40 integration). Nothing is committed.
+
+Build:
+- The root pom.xml is now the parent (packaging pom) of event, notification and app.
+- Dependencies point app → notification → event.
+- spring-boot-maven-plugin is skipped except in app, which runs with the repository root as its working directory, so .env and compose.yaml still work.
+
+Module contracts (api packages):
+- event.api: EventType, EventCreated, EventLookup and EventInfo, implemented by EventLookupService.
+- notification.api: Channel, the AlertLookup port and MatchedAlert, implemented in app by AlertLookupAdapter.
+- EventService publishes EventCreated, and the notification module's OutboxWriter (@EventListener) writes the outbox record in the same transaction.
+- OutboxProcessor and DeliveryProcessor use EventLookup and AlertLookup.
+- NotFoundException was removed; ResponseStatusException(404) is used instead.
+- Liquibase changelogs and application.yml moved to app/src/main/resources with unchanged classpath paths, so existing databases are not re-migrated.
+
+Tests:
+- Unit tests live in their module. New: EventLookupServiceTest, OutboxWriterTest, AlertLookupAdapterTest.
+- Web MVC, integration and support classes live in app.
+
+Verified:
+- mvn spring-boot:run from the root (isolated database, Compose off) started only app, read the admin from the root .env, returned 404 Problem Details for a missing event, and turned a new event into a notification log line across modules.
+- The single-test commands in CLAUDE.md were run and work.
+
+review-agent: APPROVED WITH WARNINGS. Fixed:
+- EventOutboxAtomicityIT: a failing outbox insert rolls back the event.
+- findAlert now loads the alert with its owner in one query.
+Not done: an ArchUnit module test; the Maven dependencies enforce the direction.
+
+Docs:
+- CLAUDE.md: build and commands, an Architecture section with the module table and rules, errors, enums, schema path, notifications ports, and test locations.
+- README: backend modules.
+- stage-2 decision-log.md: D-011.
+- stage-2 progress.md: refactor section.
+- The diagram now shows the module boundaries and ports.
+
+IntelliJ needs a Maven reload to pick up the new modules.
+---
+---
+Date: 2026-11-22 00:11
+
+Prompt:
+```
+NotificationSender and its implementations put into a different package(s) to make it more visibile, easier to understand how it is implemented and how to extend with new channel(s). Show me the structure before makeing any change
+```
+
+Answer:
+Proposed the structure only; no files changed.
+
+New package com.notificationapp.notification.channel in the notification module:
+- channel/NotificationSender.java: the interface (channel(), send(message)).
+- channel/NotificationMessage.java: what every sender receives.
+- channel/package-info.java: explains how sending works, and lists the steps for adding a channel.
+- channel/email/EmailNotificationSender.java: the email channel (log only for now).
+- channel/slack/SlackNotificationSender.java: the Slack channel (log only for now).
+service/ keeps OutboxWriter, OutboxProcessor, OutboxWorker, DeliveryProcessor, DeliveryWorker and FailureMessages. DeliveryProcessor imports NotificationSender from channel. Channel itself stays in notification.api, because app uses it.
+
+Steps to add a channel (to be written in package-info and CLAUDE.md):
+1. Add the value to Channel (notification.api).
+2. Add a Liquibase changeset that extends the channel CHECK constraints on alerts and notification_deliveries.
+3. Add channel/<name>/<Name>NotificationSender as a @Component implementing NotificationSender.
+4. Add the option to the frontend CHANNELS list.
+
+Only imports change elsewhere: DeliveryProcessor, DeliveryProcessorTest, NotificationMessageTest, DeliveryProcessingIT and DeliveryConcurrencyIT. Tests stay in unit/service, following the Testing Conventions. CLAUDE.md's package list gains `channel`.
+Asked: one subpackage per channel (recommended), or all three classes flat in channel/.
+---
+---
+Date: 2026-11-22 00:14
+
+Prompt:
+Approve, per-channel
+
+Answer:
+Moved the senders into a channel package with one subpackage per channel, as proposed. Behaviour is unchanged. mvn clean verify passes with 174 tests. Nothing is committed.
+
+- notification/channel/NotificationSender.java and NotificationMessage.java.
+- notification/channel/email/EmailNotificationSender.java and notification/channel/slack/SlackNotificationSender.java.
+- notification/channel/package-info.java: how sending works (claim, matching sender by channel(), failure → FAILED, senders run under the row lock, so real ones need short timeouts) and the four steps to add a channel (Channel value, Liquibase CHECK constraints on alerts and notification_deliveries, a @Component sender in channel/<name>, the frontend CHANNELS option).
+- Imports updated in DeliveryProcessor, DeliveryProcessorTest, NotificationMessageTest, DeliveryProcessingIT and DeliveryConcurrencyIT. Tests stay in unit/service.
+- CLAUDE.md: `channel` added to the package list, and the Notifications "Senders" entry now lists the steps to add a channel.
+- stage-2 progress.md: a Channel package section.
+---
+
+---
+Date: 2026-11-22 00:20
+
+Prompt:
+fix the build issue errors and update readme about how to start and test the application
+
+Answer:
+The Maven build itself was not failing: `mvn clean verify` passes (174 tests), and the IntelliJ build and the frontend build and tests pass. The errors came from stale IntelliJ run configurations left over from before the modular-monolith refactor:
+- The Spring Boot configuration "NotificationAppApplication" used the old root module `notification-app`, which is now a parent POM without sources, and had no working directory, so `.env` and `compose.yaml` were not found.
+- The JUnit configuration "java in notification-app" pointed at `src/test/java`, which no longer exists.
+
+Fixes:
+- Added the shared run configuration `.run/Backend (app).run.xml`: module `app`, main class `com.notificationapp.NotificationAppApplication`, working directory = repository root.
+- In the local `.idea/workspace.xml` (gitignored), removed the broken JUnit configuration and pointed "NotificationAppApplication" at module `app` with the repository root as working directory.
+- IntelliJ picks these up after a Maven reload (or File → Reload All from Disk).
+
+README:
+- New "Starting the backend from IntelliJ IDEA" section (Maven reload, the "Backend (app)" configuration, why the working directory matters).
+- "Running the tests" now explains Surefire vs Failsafe and where tests live, with commands for one module, a single unit test and a single integration test, and running tests from IntelliJ.
+- New "Trying out the notification flow" section: create an alert, create an event as admin, look for the `Notification [email] to …` log line.
+
+Verified: `mvn test` and the README's single-test command pass.
+---

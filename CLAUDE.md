@@ -86,25 +86,44 @@ Chosen tech stack (proposed by the user, not yet implemented):
 - JUnit 5 and Mockito for tests
 - Docker and Docker Compose
 
-Build tool: Maven (`pom.xml`, Spring Boot 4.2.0 parent, Java 21 with Lombok as an annotation processor).
+Build tool: Maven multi-module build. The root `pom.xml` is the parent (Spring Boot 4.2.0, Java 21, Lombok as an annotation processor), and the modules are `event`, `notification` and `app` (see Architecture).
 
 Commands (run from the repository root). Docker must be running: the integration tests use Testcontainers, and `spring-boot:run` starts PostgreSQL from `compose.yaml`.
-- Unit and Web MVC tests only (no Docker needed): `mvn test`
+- Unit and Web MVC tests only, all modules (no Docker needed): `mvn test`
 - All tests, including integration tests: `mvn verify`
 - Compile only: `mvn compile`
 - Run the app: `mvn spring-boot:run`
+  - Only the `app` module runs; the plugin is skipped in the other modules. The working directory is the repository root, so `compose.yaml` and `.env` are found there.
   - Starts the `compose.yaml` PostgreSQL automatically.
   - `ADMIN_EMAIL` and `ADMIN_PASSWORD` create the first admin at startup. Without them there is no admin.
-  - Locally they come from the gitignored `.env` file in the repository root (`admin` / `admin`), which `application.yml` imports. Environment variables of the same name take precedence.
+  - Locally they come from the gitignored `.env` file in the repository root, which `application.yml` imports. Environment variables of the same name take precedence.
   - Datasource settings come from `DB_URL`, `DB_USERNAME` and `DB_PASSWORD`, with local defaults in `application.yml`.
-- Run a single unit or Web MVC test: `mvn test -Dtest=ClassName` or `mvn test -Dtest=ClassName#methodName`
-- Run a single integration test: `mvn verify -Dit.test=ClassName -Dtest=NoMatch -Dsurefire.failIfNoSpecifiedTests=false`
+- Run a single unit or Web MVC test: `mvn test -pl <module> -am -Dtest=ClassName -Dsurefire.failIfNoSpecifiedTests=false` (add `#methodName` for one method).
+- Run a single integration test: `mvn verify -pl app -am -Dit.test=ClassName -Dtest=NoMatch -Dsurefire.failIfNoSpecifiedTests=false -Dfailsafe.failIfNoSpecifiedTests=false`
 
 Queue: asynchronous delivery (D-004) uses a transactional outbox plus database-backed delivery jobs in PostgreSQL, with no message broker (D-010 in `docs/stage-2/decision-log.md`).
 
 ## Architecture
 
-Single Maven module, not modular for now. Code is split into layers by package under `com.notificationapp`:
+Modular monolith: one deployable application built from three Maven modules (decision D-011 in `docs/stage-2/decision-log.md`).
+
+| Module | Package | Owns | Depends on |
+|---|---|---|---|
+| `event` | `com.notificationapp.event` | Events: `/api/v1/events`, the `events` table, publishing `EventCreated` | nothing |
+| `notification` | `com.notificationapp.notification` | The outbox, delivery jobs, workers and channel senders | `event` |
+| `app` | `com.notificationapp` (entry point) and `com.notificationapp.app` | Users, alerts, security, admin bootstrap, the `Clock`, Liquibase changelogs, `application.yml`. The only runnable module. | `event`, `notification` |
+
+Module rules:
+- **Dependencies point one way:** app → notification → event. A module never imports from a module that depends on it, and the Maven dependencies enforce this.
+- **Public API:** each module's public contract is its `api` package:
+  - `event.api`: `EventType`, `EventCreated`, `EventLookup` and `EventInfo`.
+  - `notification.api`: `Channel`, `AlertLookup` and `MatchedAlert`.
+
+  Production code in another module uses only these. Tests may use more.
+- **Reverse needs go through ports:** when a lower module needs data from a higher one, the lower module defines an interface (port) in its `api` package and the higher module implements it. Example: `AlertLookup`, implemented by `app/service/AlertLookupAdapter`.
+- **Liquibase changelogs** stay in `app/src/main/resources/db/changelog`, at the same classpath path. Liquibase identifies applied changesets by file path, so moving them would re-run every migration on existing databases.
+
+Inside each module, code is split into layers by package, for example `com.notificationapp.event.service`:
 
 - `controller`: HTTP endpoints. Calls services only.
 - `service`: business logic. Calls repositories and other services.
@@ -112,7 +131,9 @@ Single Maven module, not modular for now. Code is split into layers by package u
 - `model`: domain model: JPA entities and domain enums. Used by every layer; never returned from controllers.
 - `dto`: request and response objects exchanged through the API. Implement every DTO as a Java `record`.
 - `configuration`: Spring `@Configuration` classes and beans.
-- `NotificationAppApplication` (root package): Spring Boot entry point.
+- `api`: the module's public contract (see above). The records here are module contracts, not HTTP DTOs.
+- `channel` (notification module only): the `NotificationSender` interface, `NotificationMessage`, and one subpackage per channel (`channel/email`, `channel/slack`). See `channel/package-info.java`.
+- `NotificationAppApplication` (root package `com.notificationapp`, in `app`): Spring Boot entry point. Its package is the parent of every module, so component, entity and repository scanning covers all modules.
 
 Dependencies point one way: controller → service → repository. Controllers must not call repositories. Test layout follows the Testing Conventions below.
 
@@ -120,7 +141,7 @@ Dependencies point one way: controller → service → repository. Controllers m
 
 How the pieces fit together:
 - **Mapping:** services return entities. The controller converts them to response records before returning them, so no entity leaves the controller.
-- **Errors:** services throw `NotFoundException` (404). Spring's built-in Problem Details (`spring.mvc.problemdetails.enabled`) handles it and the `400` validation errors. There is no custom exception handler.
+- **Errors:** services throw Spring's `ResponseStatusException(HttpStatus.NOT_FOUND, …)` for a missing resource. Spring's built-in Problem Details (`spring.mvc.problemdetails.enabled`) turns it, and the `400` validation errors, into Problem Details. There is no custom exception class or handler.
 - **Security:** HTTP Basic with the `ADMIN` and `USER` roles, stateless.
   - `configuration/SecurityConfiguration` holds the URL rules: public sign-up, and admin-only user listing and event creation.
   - Ownership checks are `@PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.id")` on controller methods.
@@ -128,18 +149,25 @@ How the pieces fit together:
   - Passwords are BCrypt hashes.
   - `configuration/AdminBootstrap` creates the first admin from `ADMIN_EMAIL` and `ADMIN_PASSWORD`.
   - The access table is in `docs/stage-1/auth-implementation-plan.md`.
-- **Enums:** `EventType` and `Channel` hold their lowercase wire value. Jackson uses `@JsonValue`/`@JsonCreator`, and the database uses the auto-applied converters in `model`.
-- **Schema:** Liquibase owns it (`src/main/resources/db/changelog`, formatted SQL), and Hibernate only validates it.
+- **Enums:** `EventType` (`event.api`) and `Channel` (`notification.api`) hold their lowercase wire value. Jackson uses `@JsonValue`/`@JsonCreator`, and the database uses the auto-applied converters in each module's `model` package.
+- **Schema:** Liquibase owns it (`app/src/main/resources/db/changelog`, formatted SQL), and Hibernate only validates it.
 - **Time:** timestamps come from the `Clock` bean in `configuration`, so tests can fix the time.
 - **Notifications:** the design and rules are in `docs/stage-2/`.
-  - **Event and outbox:** `EventService.create` saves the event and an `event_outbox` record in one transaction.
+  - **Event and outbox:** `EventService.create` (event module) saves the event and publishes `EventCreated`. The notification module's `OutboxWriter` (a plain `@EventListener`) writes the `event_outbox` record in the same transaction.
+  - **Ports:** the processors read events through `EventLookup` and alerts through `AlertLookup`, which `app` implements.
   - **Outbox worker:** `OutboxWorker` (`@Scheduled`) calls `OutboxProcessor.processNext()`. In one transaction, the processor:
     1. claims a record with `FOR UPDATE SKIP LOCKED`;
     2. finds the enabled alerts of the event type;
     3. inserts one `notification_deliveries` job per alert (`ON CONFLICT (event_id, alert_id) DO NOTHING`);
     4. marks the record `PROCESSED`.
   - **Delivery worker:** `DeliveryWorker` calls `DeliveryProcessor`, which claims a job the same way and passes a `NotificationMessage` to the `NotificationSender` for the job's channel.
-  - **Senders:** `EmailNotificationSender` and `SlackNotificationSender` only log for now. A new channel is one more `NotificationSender`.
+  - **Senders:** they live in `notification/channel`, one subpackage per channel. `EmailNotificationSender` and `SlackNotificationSender` only log for now. To add a channel:
+    1. Add a `Channel` value.
+    2. Add a Liquibase changeset that extends the `channel` CHECK constraints on `alerts` and `notification_deliveries`.
+    3. Add `channel/<name>/<Name>NotificationSender` as a `@Component`.
+    4. Add the option to the frontend `CHANNELS` list.
+
+    The details are in `channel/package-info.java`.
   - **Failures:** a failure rolls back and marks the record or job `FAILED` in a second transaction. There are no retries.
   - **Settings:** `app.notifications.*` holds the batch size and poll intervals. `app.notifications.scheduling.enabled=false` turns the workers off; integration tests do this and call the processors directly.
 - **Tests:**
@@ -152,7 +180,11 @@ These rules are mandatory for every new test and every test refactoring. Do not 
 
 ### Structure
 
-Under `src/test/java/com/notificationapp/`, every test class sits in the folder that matches its package. Keep `unit`, `web`, `integration` and `support` as separate top-level packages, and never put all tests in one package.
+Each module has its own `<module>/src/test/java/com/notificationapp/`. Under it, every test class sits in the folder that matches its package. Keep `unit`, `web`, `integration` and `support` as separate top-level packages, and never put all tests in one package.
+
+Which module a test lives in:
+- **Unit tests:** in the module that owns the class under test (`event`, `notification` or `app`).
+- **Web MVC and integration tests:** in `app`. They need the Spring Boot configuration, which only `app` has. The same applies to the shared `support` classes.
 
 ```text
 unit/
