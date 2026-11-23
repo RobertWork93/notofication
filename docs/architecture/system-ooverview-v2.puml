@@ -1,0 +1,39 @@
+@startuml module-architecture
+' Smetana is PlantUML's built-in layout engine, so Graphviz is not needed.
+!pragma layout smetana
+
+title Notification App - Target module architecture
+
+skinparam shadowing false
+skinparam componentStyle rectangle
+skinparam defaultTextAlignment center
+skinparam nodesep 60
+skinparam ranksep 50
+
+actor "Users" as Users
+component "Event Trigger\nService" as Trigger #F5F5F5
+
+rectangle " " {
+  component "**app module**\nUsers and alerts, receives events" as App #E3F2FD
+  queue "Event queue" as EventQueue
+  component "**event module**\nProcesses and stores events" as Event #FFF3E0
+  queue "Notification queue" as NotificationQueue
+  component "**notification module**\nSends to the selected channel" as Notification #E8F5E9
+}
+
+cloud "Email" as Email
+cloud "Slack" as Slack
+
+Users -down-> App : manage alerts
+Trigger -down-> App : new event
+
+App -down-> EventQueue : generates\nmessage
+EventQueue -down-> Event : consumes
+
+Event -down-> NotificationQueue : generates\nmessage
+NotificationQueue -down-> Notification : consumes
+
+Notification -down-> Email : email message
+Notification -down-> Slack : Slack message
+
+@enduml
